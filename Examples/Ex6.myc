@@ -1,0 +1,7 @@
+int x;
+float y;
+int main() {
+    x = 3;
+    y = 2.0;
+    return 1+y*x;
+}

@@ -21,6 +21,20 @@ void yyerror (char* s) {
   strcat(result, str2);
   return result;
 }
+
+
+char* intToString(int number) {
+    // Determine the number of digits in the integer
+    int numDigits = snprintf(NULL, 0, "%d", number);
+
+    // Allocate memory for the string (including space for null terminator)
+    char* result = (char*)malloc((numDigits + 1) * sizeof(char));
+
+    // Convert the integer to a string
+    snprintf(result, numDigits + 1, "%d", number);
+
+    return result;
+}
 %}
 
 %union { 
@@ -103,17 +117,17 @@ fun : type fun_head fun_body   {}
 ;
 
 fun_head : ID PO PF            {
-  // Pas de déclaration de fonction à l'intérieur de fonctions !
-  if (depth>0) yyerror("Function must be declared at top level~!\n");
-    printf("%s pcode_%s()\n", type2string($<type_value>0), $1);
-  }
+    // Pas de déclaration de fonction à l'intérieur de fonctions !
+    if (depth>0) yyerror("Function must be declared at top level~!\n");
+      printf("%s pcode_%s()", type2string($<type_value>0), $1);
+    }
 
 | ID PO params PF              {
-   // Pas de déclaration de fonction à l'intérieur de fonctions !
-  if (depth>0) yyerror("Function must be declared at top level~!\n");
-  char * parameters = $<string_value>3;
-  printf("%s pcode_%s( %s )\n", type2string($<type_value>0), $1,parameters);
-  free(parameters);
+    // Pas de déclaration de fonction à l'intérieur de fonctions !
+    if (depth>0) yyerror("Function must be declared at top level~!\n");
+    char * parameters = $<string_value>3;
+    printf("%s pcode_%s( %s )", type2string($<type_value>0), $1,parameters);
+    free(parameters);
  }
 ;
 
@@ -123,8 +137,8 @@ params: type ID vir params     {
                         concatenate_strings(type2string($<type_value>1), " " ), concatenate_strings($2, ",")), 
                         $<string_value>4);
                                 } // récursion droite pour numéroter les paramètres du dernier au premier
-| type ID                      {/*printf("%s %s", type2string($<type_value>1), $2);*/
-                              $<string_value>$ = concatenate_strings(concatenate_strings(type2string($<type_value>1), " "), $2);
+| type ID                      { 
+                    $<string_value>$ = concatenate_strings(concatenate_strings(type2string($<type_value>1), " "), $2);
 }
 
 
@@ -135,9 +149,9 @@ vir : VIR                      { /*$<string_value>$ = concatenate_strings($<stri
 fun_body : fao block faf       {}
 ;
 
-fao : AO                       {depth++;}
+fao : AO                       { printf("{\n") ;depth++;}
 ;
-faf : AF                       {depth--;}
+faf : AF                       {printf("}\n") ;depth--;}
 ;
 
 
@@ -155,24 +169,62 @@ decl_list : decl_list decl PV   {}
 decl: var_decl                  {}
 ;
 
-var_decl : type vlist          {}
+var_decl : type vlist          { 
+                                char * list = $<string_value>2 ;
+                                printf("%s", list);
+                                free(list);}
 ;
 
-vlist: vlist vir ID            {} // récursion gauche pour traiter les variables déclararées de gauche à droite
-//| ID                           {set_symbol_value($1, makeSymbol( $<type_value>0, depth + offset));} 
+vlist: vlist vir ID            { // récursion gauche pour traiter les variables déclararées de gauche à droite
+                                    int offset_value = 0; // à calculer
+                                    if(depth == 0){ //pour les variables globales
+                                      set_symbol_value($3, makeSymbol( $<type_value>0 , 0 , 0));
+                                      if($<type_value>0 == INT){
+                                        char * str1 = concatenate_strings("LOADI(", concatenate_strings(intToString(get_symbol_value($3)->offset), ")\n"));
+                                        $<string_value>$ = concatenate_strings($<string_value>1, str1);
+                                      }
+                                      else if($<type_value>0 == FLOAT){
+                                        char * str1 = concatenate_strings("LOADF(", concatenate_strings(intToString(get_symbol_value($3)->offset), ")\n"));
+                                        $<string_value>$ = concatenate_strings($<string_value>1, str1);
+                                      }
+                                    }
+                                 else {
+                                      set_symbol_value($3, makeSymbol( $<type_value>0 , depth + offset_value , depth));
+                                      if($<type_value>0 == INT){
+                                        char * str1 = concatenate_strings("LOADI(", concatenate_strings(intToString(get_symbol_value($3)->offset), ")\n"));
+                                        $<string_value>$ = concatenate_strings($<string_value>1, str1);
+                                      }
+                                      else if($<type_value>0 == FLOAT){
+                                        char * str1 = concatenate_strings("LOADF(", concatenate_strings(intToString(get_symbol_value($3)->offset), ")\n"));
+                                        $<string_value>$ = concatenate_strings($<string_value>1, str1);
+                                      }
+                                 } 
+} 
 | ID                           {
                                     int offset_value = 0; // à calculer
                                     if(depth == 0){ //pour les variables globales
                                       set_symbol_value($1, makeSymbol( $<type_value>0 , offset_value , 0));
-                                      if(type2string($<type_value>0 == INT)){
-                                        printf("LOADI(%d)\n", get_symbol_value($1)->offset );
+                                      char * str1;
+                                      if($<type_value>0 == INT){
+                                        str1 = concatenate_strings("LOADI(", concatenate_strings(intToString(get_symbol_value($1)->offset), ")\n"));
                                       }
-                                      else if(type2string($<type_value>0 == FLOAT)){
-                                        printf("LOADF(%d)\n", get_symbol_value($1)->offset );
+                                      else if($<type_value>0 == FLOAT){
+                                         str1 = concatenate_strings("LOADF(", concatenate_strings(intToString(get_symbol_value($1)->offset), ")\n"));
                                       }
+                                      $<string_value>$ = str1;
                                     }
-                                 else set_symbol_value($1, makeSymbol( $<type_value>0 , depth + offset_value, depth));   
-} 
+                                 else{
+                                        set_symbol_value($1, makeSymbol( $<type_value>0 , depth + offset_value, depth));
+                                        char * str1;
+                                        if($<type_value>0 == INT){
+                                          str1 = concatenate_strings("LOADI(", concatenate_strings(intToString(get_symbol_value($1)->offset), ")\n"));
+                                        }
+                                        else if($<type_value>0 == FLOAT){
+                                          str1 = concatenate_strings("LOADF(", concatenate_strings(intToString(get_symbol_value($1)->offset), ")\n"));
+                                        }
+                                        $<string_value>$ = str1;
+                                  }
+}                             
 ;
 
 type
@@ -265,41 +317,85 @@ exp
 : MOINS exp %prec UNA         {}
          // -x + y lue comme (- x) + y  et pas - (x + y)
 | exp PLUS exp                { 
-                              if ($1 == INT && $3 == INT){ 
-                                $$ = INT;
-                                  };
-                              if ($1 == FLOAT || $3 == FLOAT){
-                                $$ = FLOAT;
-                                  };
-                              if($$ == INT) {printf("ADDI\n");}
-                              else if ( $$ == FLOAT ) {printf("ADDF\n");};
+                              if ($1 == INT) {
+                                  if ($3 == INT) {
+                                      $$ = INT;
+                                  }
+                                  else if ($3 == FLOAT) {
+                                      printf("I2F2\n");
+                                  }
                               }
-| exp MOINS exp               {if ($1 == INT && $3 == INT){ 
-                                $$ = INT;
-                                  };
-                              if ($1 == FLOAT || $3 == FLOAT){
-                                $$ = FLOAT;
-                                  };
-                              if($$ == INT) {printf("SUBI\n");}
-                              else if ( $$ == FLOAT ) {printf("SUBF\n");}; }
+                              else if ($1 == FLOAT) {
+                                  if ($3 == INT) {
+                                      printf("I2F\n");
+                                  }
+                                  else if ($3 == FLOAT) {
+                                      $$ = FLOAT;
+                                  }
+                              }
+                              if ($$ == INT) { printf("ADDI\n");}
+                              else if ($$ == FLOAT) { printf("ADDF\n");}
+                              }
+| exp MOINS exp               {
+                              if ($1 == INT) {
+                                  if ($3 == INT) {
+                                      $$ = INT;
+                                  }
+                                  else if ($3 == FLOAT) {
+                                      printf("I2F2\n");
+                                  }
+                              }
+                              else if ($1 == FLOAT) {
+                                  if ($3 == INT) {
+                                      printf("I2F\n");
+                                  }
+                                  else if ($3 == FLOAT) {
+                                      $$ = FLOAT;
+                                  }
+                              }
+                              if ($$ == INT) { printf("SUBI\n");}
+                              else if ($$ == FLOAT) { printf("SUBF\n");}
+                              }
 | exp STAR exp                {
-                                if ($1 == INT && $3 == INT){ 
-                                $$ = INT;
-                                  };
-                              if ($1 == FLOAT || $3 == FLOAT){
-                                $$ = FLOAT;
-                                  };
-                              if($$ == INT) {printf("MULTI\n");}
-                              else if ( $$ == FLOAT ) {printf("MULTF\n");};
+                                if ($1 == INT) {
+                                  if ($3 == INT) {
+                                      $$ = INT;
+                                  }
+                                  else if ($3 == FLOAT) {
+                                      printf("I2F2\n");
+                                  }
+                              }
+                              else if ($1 == FLOAT) {
+                                  if ($3 == INT) {
+                                      printf("I2F\n");
+                                  }
+                                  else if ($3 == FLOAT) {
+                                      $$ = FLOAT;
+                                  }
+                              }
+                              if ($$ == INT) { printf("MULTI\n");}
+                              else if ($$ == FLOAT) { printf("MULTF\n");}
                                 }               
-| exp DIV exp                 { if ($1 == INT && $3 == INT){ 
-                                $$ = INT;
-                                  };
-                              if ($1 == FLOAT || $3 == FLOAT){
-                                $$ = FLOAT;
-                                  };
-                              if($$ == INT) {printf("DIVI\n");}
-                              else if ( $$ == FLOAT ) {printf("DIVF\n");};}
+| exp DIV exp                 { 
+                              if ($1 == INT) {
+                                  if ($3 == INT) {
+                                      $$ = INT;
+                                  }
+                                  else if ($3 == FLOAT) {
+                                      printf("I2F2\n");
+                                  }
+                              }
+                              else if ($1 == FLOAT) {
+                                  if ($3 == INT) {
+                                      printf("I2F\n");
+                                  }
+                                  else if ($3 == FLOAT) {
+                                      $$ = FLOAT;
+                                  }
+                              }
+                              if ($$ == INT) { printf("DIVI\n");}
+                              else if ($$ == FLOAT) { printf("DIVF\n");}
+                              }
 | PO exp PF                   {}
 | ID                          {printf("LOADP(%d)\n", get_symbol_value($1)->offset);}
 | app                         {}

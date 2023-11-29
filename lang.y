@@ -264,23 +264,47 @@ exp
 // V.1 Exp. arithmetiques
 : MOINS exp %prec UNA         {}
          // -x + y lue comme (- x) + y  et pas - (x + y)
-| exp PLUS exp                { printf("ADDI\n");}
-| exp MOINS exp               { printf("SUBI\n"); }
-| exp STAR exp                { //printf("MULTI\n");
-                                if ($<type_value>1 == INT && $<type_value>3 == INT){
-                                  printf("MULTI\n");
-                                }
-                                else if ($<type_value>1 == FLOAT || $<type_value>3 == FLOAT){
-                                  printf("MULTF\n");
-                                }
-
+| exp PLUS exp                { 
+                              if ($1 == INT && $3 == INT){ 
+                                $$ = INT;
+                                  };
+                              if ($1 == FLOAT || $3 == FLOAT){
+                                $$ = FLOAT;
+                                  };
+                              if($$ == INT) {printf("ADDI\n");}
+                              else if ( $$ == FLOAT ) {printf("ADDF\n");};
+                              }
+| exp MOINS exp               {if ($1 == INT && $3 == INT){ 
+                                $$ = INT;
+                                  };
+                              if ($1 == FLOAT || $3 == FLOAT){
+                                $$ = FLOAT;
+                                  };
+                              if($$ == INT) {printf("SUBI\n");}
+                              else if ( $$ == FLOAT ) {printf("SUBF\n");}; }
+| exp STAR exp                {
+                                if ($1 == INT && $3 == INT){ 
+                                $$ = INT;
+                                  };
+                              if ($1 == FLOAT || $3 == FLOAT){
+                                $$ = FLOAT;
+                                  };
+                              if($$ == INT) {printf("MULTI\n");}
+                              else if ( $$ == FLOAT ) {printf("MULTF\n");};
                                 }               
-| exp DIV exp                 { printf("DIVI\n");}
+| exp DIV exp                 { if ($1 == INT && $3 == INT){ 
+                                $$ = INT;
+                                  };
+                              if ($1 == FLOAT || $3 == FLOAT){
+                                $$ = FLOAT;
+                                  };
+                              if($$ == INT) {printf("DIVI\n");}
+                              else if ( $$ == FLOAT ) {printf("DIVF\n");};}
 | PO exp PF                   {}
 | ID                          {printf("LOADP(%d)\n", get_symbol_value($1)->offset);}
 | app                         {}
-| NUM                         {printf("LOADI(%d)\n", $1 );}
-| DEC                         {printf("LOADF(%f)\n", $1 );}
+| NUM                         {$$ = INT ; printf("LOADI(%d)\n", $1 );}
+| DEC                         {$$ = FLOAT; printf("LOADF(%f)\n", $1 );}
 
 
 // V.2. Booléens

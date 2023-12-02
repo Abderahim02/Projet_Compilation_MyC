@@ -140,22 +140,21 @@ params: type ID vir params     {
 }
 
 
-vir : VIR                      { /*$<string_value>$ = concatenate_strings($<string_value>$, ",") ;*/
-                                /*$<string_value>1 = ", ";*/}
+vir : VIR                      {}
 ;
 
 fun_body : fao block faf       {}
 ;
 
-fao : AO                       { printf("{\n") ;depth++;}
+fao : AO                       { printf("{\n") ; }
 ;
-faf : AF                       {printf("}\n") ;depth--;}
+faf : AF                       {printf("}\n") ; }
 ;
 
 
 // II. Block
 block:
-decl_list inst_list            { depth++;}
+decl_list inst_list            { }
 ;
 
 // III. Declarations
@@ -175,19 +174,28 @@ vlist: vlist vir ID            { // récursion gauche pour traiter les variables
                                     if(depth == 0){ //pour les variables globales
                                       set_symbol_value($<string_value>3, makeSymbol( $<type_value>0 , $$ , 0));
                                       if($<type_value>0 == INT){
-                                        printf("LOADI(%d)\n",$$);
+                                        //printf("LOADI(%d)\n",$$);
+                                        //on peut ne pas afficher l offset 
+                                        printf("LOADI(0)\n");
+                                        
                                       }
                                       else if($<type_value>0 == FLOAT){
-                                        printf("LOADF(%d)\n",$$);
+                                        //printf("LOADF(%d)\n",$$);
+                                        //on peut ne pas afficher l offset 
+                                        printf("LOADF(0.0)\n");
                                       }
                                     }
                                  else {
                                       set_symbol_value($3, makeSymbol( $<type_value>0 , $$ , depth));
                                       if($<type_value>0 == INT){                                       
-                                        printf("LOADI(%d)\n",$$);
+                                        //printf("LOADI(%d)\n",$$);
+                                         //on peut ne pas afficher l offset 
+                                        // printf("LOADI(0)\n");
                                       }
                                       else if($<type_value>0 == FLOAT){
-                                        printf("LOADF(%d)\n", $$);
+                                        // printf("LOADF(%d)\n", $$);
+                                         //on peut ne pas afficher l offset 
+                                        printf("LOADF(0.0)\n");
                                       }
                                  } 
 } 
@@ -199,21 +207,27 @@ vlist: vlist vir ID            { // récursion gauche pour traiter les variables
                                 if (depth == 0){
                                       set_symbol_value($1, makeSymbol( $<type_value>0 , $$ , depth));
                                       if($<type_value>0 == INT){
-                                        printf("LOADI(%d)\n", $$);
+                                        // printf("LOADI(%d)\n", $$);
+                                        printf("LOADI(0)\n");
+
                                       }
                                       else if($<type_value>0 == FLOAT){
-                                        printf("LOADF(%d)\n", $$);
+                                        // printf("LOADF(%d)\n", $$);
+                                        printf("LOADF(0.0)\n");
 
                                       }
                                     }
                                  else{
                                         set_symbol_value($1, makeSymbol( $<type_value>0 , $$, depth));
                                         if($<type_value>0 == INT){
-                                          printf("LOADI(%d)\n", $$);
+                                          // printf("LOADI(%d)\n", $$);
+                                        printf("LOADI(0)\n");
+
 
                                         }
                                         else if($<type_value>0 == FLOAT){
-                                          printf("LOADI(%d)\n", $$);
+                                          // printf("LOADI(%d)\n", $$);
+                                        printf("LOADF(0.0)\n");
 
                                         }
                                   }
@@ -250,10 +264,10 @@ ao block af                   {}
 
 // Accolades explicites pour gerer l'entrée et la sortie d'un sous-bloc
 
-ao : AO                       {depth++;}
+ao : AO                       {printf("SAVEBP\n"); depth++;}
 ;
 
-af : AF                       {depth--;}
+af : AF                       {printf("RESTOREBP\n");depth--;}
 ;
 
 
@@ -279,28 +293,38 @@ cond :
 if bool_cond inst  elsop       {}
 ;
 
-elsop : else inst              {}
+elsop : else inst              {printf("End_%d\n", depth);}
 |                  %prec IFX   {} // juste un "truc" pour éviter le message de conflit shift / reduce
 ;
 
-bool_cond : PO exp PF         {}
+bool_cond : PO exp PF         {  
+                              printf("GTF\n");
+                              printf("IFN(False_%d)\n", depth);
+                              }
 ;
 
 if : IF                       {}
 ;                                      
 
 
-else : ELSE                   {}
+else : ELSE                   {
+                              printf("GOTO(End_%d)\n", depth);
+                              printf("False_%d:\n", depth); 
+                              }
 ;
 
 // IV.4. Iterations
 
-loop : while while_cond inst  {}
+loop : while while_cond inst  {printf("GOTO(StartLoop_%d)\n", depth);
+                              printf("EndLoop_%d:\n", depth);}
 ;
 
-while_cond : PO exp PF        {}
+while_cond : PO exp PF        {
+                              printf("GTI\n");
+                              printf("IFN(EndLoop_%d)\n", depth);
+                                }
 
-while : WHILE                 {}
+while : WHILE                 {printf("StartLoop_%d:\n", depth);}
 ;
 
 
@@ -393,7 +417,10 @@ exp
                               else if ($$ == FLOAT) { printf("DIVF\n");}
                               }
 | PO exp PF                   {}
-| ID                          {printf("LOADP(%d)\n", get_symbol_value($1)->offset);}
+| ID                          { 
+                                $$ = get_symbol_value($1)->type;
+                                printf("LOADP(%d)\n", get_symbol_value($1)->offset);
+  }
 | app                         {}
 | NUM                         {$$ = INT ; printf("LOADI(%d)\n", $1 );}
 | DEC                         {$$ = FLOAT; printf("LOADF(%f)\n", $1 );}

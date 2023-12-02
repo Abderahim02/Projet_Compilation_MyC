@@ -1,0 +1,15 @@
+int x;
+int b;
+float a;
+int y;
+int z;
+float t;
+int m;
+int n;
+float a;
+
+float o,p,q;
+int main(int argc, int argv, int argz) {
+    x = 3;
+    return 1 + x;
+}

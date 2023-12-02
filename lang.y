@@ -96,20 +96,18 @@ char * type2string (int c) {
 // liste de tous les non terminaux dont vous voulez manipuler l'attribut
 %type <type_value> type exp  typename
 %type <string_value> fun_head
-%type <offset_value> decl_list
-%type <int_value> vlist
  /* Attention, la rêgle de calcul par défaut $$=$1 
     peut créer des demandes/erreurs de type d'attribut */
-
+%type <offset_value> prog glob_decl_list decl_list decl var_decl vlist 
 %%
 
  // O. Déclaration globale
 
-prog : glob_decl_list              {}
+prog : glob_decl_list              {$$ = $1 ;}
 
-glob_decl_list : glob_decl_list fun {}
-| glob_decl_list decl PV       {}
-|                              {} // empty glob_decl_list shall be forbidden, but usefull for offset computation
+glob_decl_list : glob_decl_list fun { $$ = $$ ;}
+| glob_decl_list decl PV       {$$ = $2; } // le compteur pour les variables globale s
+|                              {$$ = -1;} // empty glob_decl_list shall be forbidden, but usefull for offset computation
 
 // I. Functions
 
@@ -162,19 +160,18 @@ decl_list inst_list            { depth++;}
 
 // III. Declarations
 
-decl_list : decl_list decl PV   {} 
-|                               {}
+decl_list : decl_list decl PV   {$$ = $1 + $2;} 
+|                               { $$ = 0;}
 ;
 
-decl: var_decl                  {}
+decl: var_decl                  {$$ = $1; /*printf("var_decl = %d \n", $<offset_value>1);*/}
 ;
 
-var_decl : type vlist          { }
+var_decl : type vlist          { $$ = $2; }
 ;
 
 vlist: vlist vir ID            { // récursion gauche pour traiter les variables déclararées de gauche à droite
-                                    // $$ = get_symbol_value($3)->offset + 1; // à calculer
-                                    $$ = $$+ 1; // à calculer
+                                    $$ = $$+ 1; 
                                     if(depth == 0){ //pour les variables globales
                                       set_symbol_value($<string_value>3, makeSymbol( $<type_value>0 , $$ , 0));
                                       if($<type_value>0 == INT){
@@ -195,9 +192,11 @@ vlist: vlist vir ID            { // récursion gauche pour traiter les variables
                                  } 
 } 
 | ID                           {
-                                    $$ = $<int_value>0 - INT  ; 
-                                    // $$ = $<int_value>-1;
-                                    if(depth == 0){ //pour les variables globales
+                                    
+                                    /*on recupere la valeur precedente de l offset dans l attribut
+                                    glob_decl_list avec $<int_value>-1*/
+                                    $$ = $<int_value>-1 + 1;
+                                if (depth == 0){
                                       set_symbol_value($1, makeSymbol( $<type_value>0 , $$ , depth));
                                       if($<type_value>0 == INT){
                                         printf("LOADI(%d)\n", $$);
@@ -307,8 +306,8 @@ while : WHILE                 {}
 
 // V. Expressions
 
-exp
 // V.1 Exp. arithmetiques
+exp
 : MOINS exp %prec UNA         {}
          // -x + y lue comme (- x) + y  et pas - (x + y)
 | exp PLUS exp                { 

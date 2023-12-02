@@ -1,0 +1,6 @@
+int x, y, z;
+float a, b, c;
+int main(int argc, int argv, int argz) {
+    x = y * 3 + b;
+    return 9.5 + 2 * x;
+}

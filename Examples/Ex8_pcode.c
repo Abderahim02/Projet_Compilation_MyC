@@ -4,7 +4,7 @@
 
 int main() {
 pcode_main();
-return srack[sp-1].int_value;
+return stack[sp-1].int_value;
 }
 
 LOADF(0.0)

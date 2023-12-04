@@ -1,0 +1,13 @@
+int main() {
+int x;
+x = 3;
+{
+int y;
+y=x;
+{
+int z;
+z = x;
+}
+}
+return 1;
+}

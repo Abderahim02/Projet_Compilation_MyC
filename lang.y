@@ -418,8 +418,29 @@ exp
                               }
 | PO exp PF                   {}
 | ID                          { 
+                                // printf("les cordonnes de %s sont offset=%d depth=%d\n", $1, get_symbol_value($1)->offset, get_symbol_value($1)->depth);
                                 $$ = get_symbol_value($1)->type;
                                 printf("LOADP(%d)\n", get_symbol_value($1)->offset);
+
+                                // if(depth == 0){
+                                //   printf("LOADP(%d)\n", get_symbol_value($1)->offset);
+                                // }
+                                // else{
+                                //   // ce morcceau de code sert à afficher LOADP(stack[...bp] +1)
+                                //   char * str  = "LOADP(";
+                                //   int i = depth - get_symbol_value($1)->depth;
+                                //   while (i < 0){
+                                //     str = concatenate_strings(str, "stack[");
+                                //     --i;
+                                //   }
+                                //   i = depth - get_symbol_value($1)->depth;
+                                //   str = concatenate_strings(str, "bp");
+                                //   while (i < 0){
+                                //     str = concatenate_strings(str, "]");
+                                //   }
+                                //   str = concatenate_strings(str, "+ 1)");
+                                //   printf("%s\n", str);
+                                // }
   }
 | app                         {}
 | NUM                         {$$ = INT ; printf("LOADI(%d)\n", $1 );}
@@ -470,7 +491,7 @@ char * header=
 \n\
 int main() {\n\
 pcode_main();\n\
-return srack[sp-1].int_value;\n\
+return stack[sp-1].int_value;\n\
 }\n";  
 
  printf("%s\n",header); // ouput header

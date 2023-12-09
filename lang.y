@@ -22,17 +22,14 @@ void yyerror (char* s) {
   return result;
 }
 
+int make_label(){
+  static int n = 0;
+  return n++;
+}
 
-char* intToString(int number) {
-    // Determine the number of digits in the integer
-    int numDigits = snprintf(NULL, 0, "%d", number);
-
-    // Allocate memory for the string (including space for null terminator)
-    char* result = (char*)malloc((numDigits + 1) * sizeof(char));
-
-    // Convert the integer to a string
-    snprintf(result, numDigits + 1, "%d", number);
-    return result;
+int make_label_while(){
+   static int n = 0;
+  return n++;
 }
 %}
 
@@ -86,8 +83,54 @@ char * type2string (int c) {
       return("type error");
     }  
 };
-
-  
+//cette fonction sert à afficher une expression, elle prend en parametre les valeurs de $1 et $3 et l operateur 
+int print_expression( int dollar_1, int dollar_3 ,char * operator){
+                      int result ;
+                              if (dollar_1 == INT) {
+                                  if (dollar_3 == INT) {
+                                      result = INT;
+                                  }
+                                  else if (dollar_3 == FLOAT) {
+                                      printf("I2F2\n");
+                                      result = FLOAT;
+                                  }
+                              }
+                              else if (dollar_1 == FLOAT) {
+                                  if (dollar_3 == INT) {
+                                      printf("I2F\n");
+                                      result = FLOAT;
+                                  }
+                                  else if (dollar_3 == FLOAT) {
+                                      result = FLOAT;
+                                  }
+                              }
+                              if (result == INT) { printf("%sI\n", operator);}
+                              else if (result == FLOAT) { printf("%sF\n", operator);}
+                              return result;
+};
+ // cette fonction sert à afficher LOADP(stack[...bp] +1) ou  STOREP(stack[...bp] +1)
+void print_loadp_or_storep(int _depth, int symbole_depth, int symbole_offset ,char store_or_load){
+                                  switch(store_or_load){
+                                      case 'l':
+                                        printf("LOADP(");
+                                        break;
+                                      case 's':
+                                        printf("STOREP(");
+                                        break;
+                                  }
+                                  int i = _depth - symbole_depth;
+                                  while (i > 0){
+                                    printf("stack[");
+                                    --i;
+                                  }
+                                  i = _depth - symbole_depth;
+                                  printf("bp");
+                                  while (i > 0){
+                                    printf("]");
+                                    --i;
+                                  }
+                                  printf(" + %d)\n", symbole_offset);
+};
   %}
 
 
@@ -99,13 +142,14 @@ char * type2string (int c) {
  /* Attention, la rêgle de calcul par défaut $$=$1 
     peut créer des demandes/erreurs de type d'attribut */
 %type <offset_value> prog glob_decl_list decl_list decl var_decl vlist 
+%type <label_value> if  else while bool_cond
 %%
 
  // O. Déclaration globale
 
 prog : glob_decl_list              {$$ = $1 ;}
 
-glob_decl_list : glob_decl_list fun { $$ = $$ ;}
+glob_decl_list : glob_decl_list fun { $$ = $1 ;}
 | glob_decl_list decl PV       {$$ = $2; } // le compteur pour les variables globale s
 |                              {$$ = -1;} // empty glob_decl_list shall be forbidden, but usefull for offset computation
 
@@ -146,9 +190,9 @@ vir : VIR                      {}
 fun_body : fao block faf       {}
 ;
 
-fao : AO                       { printf("{\n") ; }
+fao : AO                       { printf("{\n"); depth++;}
 ;
-faf : AF                       {printf("}\n") ; }
+faf : AF                       {printf("}\n") ; depth--;}
 ;
 
 
@@ -163,74 +207,36 @@ decl_list : decl_list decl PV   {$$ = $1 + $2;}
 |                               { $$ = 0;}
 ;
 
-decl: var_decl                  {$$ = $1; /*printf("var_decl = %d \n", $<offset_value>1);*/}
+decl: var_decl                  {$$ = $1; }
 ;
 
 var_decl : type vlist          { $$ = $2; }
 ;
 
 vlist: vlist vir ID            { // récursion gauche pour traiter les variables déclararées de gauche à droite
-                                    $$ = $$+ 1; 
-                                    if(depth == 0){ //pour les variables globales
-                                      set_symbol_value($<string_value>3, makeSymbol( $<type_value>0 , $$ , 0));
+                                    $$ = $1+ 1; 
+                                      set_symbol_value($<string_value>3, makeSymbol( $<type_value>0 , $$ , depth));
                                       if($<type_value>0 == INT){
-                                        //printf("LOADI(%d)\n",$$);
                                         //on peut ne pas afficher l offset 
                                         printf("LOADI(0)\n");
                                         
                                       }
-                                      else if($<type_value>0 == FLOAT){
-                                        //printf("LOADF(%d)\n",$$);
-                                        //on peut ne pas afficher l offset 
-                                        printf("LOADF(0.0)\n");
+                                     else if($<type_value>0 == FLOAT){
+                                      printf("LOADF(0.0)\n");
                                       }
-                                    }
-                                 else {
-                                      set_symbol_value($3, makeSymbol( $<type_value>0 , $$ , depth));
-                                      if($<type_value>0 == INT){                                       
-                                        //printf("LOADI(%d)\n",$$);
-                                         //on peut ne pas afficher l offset 
-                                        // printf("LOADI(0)\n");
-                                      }
-                                      else if($<type_value>0 == FLOAT){
-                                        // printf("LOADF(%d)\n", $$);
-                                         //on peut ne pas afficher l offset 
-                                        printf("LOADF(0.0)\n");
-                                      }
-                                 } 
 } 
-| ID                           {
-                                    
+| ID                           {                            
                                     /*on recupere la valeur precedente de l offset dans l attribut
                                     glob_decl_list avec $<int_value>-1*/
                                     $$ = $<int_value>-1 + 1;
-                                if (depth == 0){
-                                      set_symbol_value($1, makeSymbol( $<type_value>0 , $$ , depth));
+                                      set_symbol_value($1, makeSymbol( $<type_value>0 , $$ , depth  ));
                                       if($<type_value>0 == INT){
-                                        // printf("LOADI(%d)\n", $$);
                                         printf("LOADI(0)\n");
 
                                       }
                                       else if($<type_value>0 == FLOAT){
-                                        // printf("LOADF(%d)\n", $$);
                                         printf("LOADF(0.0)\n");
-
                                       }
-                                    }
-                                 else{
-                                        set_symbol_value($1, makeSymbol( $<type_value>0 , $$, depth));
-                                        if($<type_value>0 == INT){
-                                          // printf("LOADI(%d)\n", $$);
-                                        printf("LOADI(0)\n");
-
-
-                                        }
-                                        else if($<type_value>0 == FLOAT){
-                                          // printf("LOADI(%d)\n", $$);
-                                        printf("LOADF(0.0)\n");
-
-                                        }
-                                  }
 }                             
 ;
 
@@ -274,7 +280,7 @@ af : AF                       {printf("RESTOREBP\n");depth--;}
 // IV.1 Affectations
 
 aff : ID EQ exp               { 
-      printf("STOREP(%d)\n",get_symbol_value($1)->offset );
+      print_loadp_or_storep(depth, get_symbol_value($1)->depth , get_symbol_value($1)->offset, 's');
       }
 ;
 
@@ -293,38 +299,39 @@ cond :
 if bool_cond inst  elsop       {}
 ;
 
-elsop : else inst              {printf("End_%d\n", depth);}
+elsop : else inst              { printf("End_%d\n", $<label_value>-2); }
 |                  %prec IFX   {} // juste un "truc" pour éviter le message de conflit shift / reduce
 ;
 
 bool_cond : PO exp PF         {  
                               printf("GTF\n");
-                              printf("IFN(False_%d)\n", depth);
+                              printf("IFN(False_%d)\n", $<label_value>0); //   regler
                               }
 ;
 
-if : IF                       {}
+if : IF                       { $$ = make_label();}
 ;                                      
 
 
 else : ELSE                   {
-                              printf("GOTO(End_%d)\n", depth);
-                              printf("False_%d:\n", depth); 
+                              printf("GOTO(End_%d)\n", $<label_value>-2);
+                              printf("False_%d:\n", $<label_value>-2); 
                               }
 ;
-
+// faire memes modifs que le if 
 // IV.4. Iterations
 
-loop : while while_cond inst  {printf("GOTO(StartLoop_%d)\n", depth);
-                              printf("EndLoop_%d:\n", depth);}
+loop : while while_cond inst  {printf("GOTO(StartLoop_%d)\n", $<label_value>1);
+                              printf("EndLoop_%d:\n", $<label_value>1);}
 ;
 
 while_cond : PO exp PF        {
                               printf("GTI\n");
-                              printf("IFN(EndLoop_%d)\n", depth);
+                              printf("IFN(EndLoop_%d)\n", $<label_value>0);
                                 }
 
-while : WHILE                 {printf("StartLoop_%d:\n", depth);}
+while : WHILE                 {$$ = make_label_while();
+                              printf("StartLoop_%d:\n",  $$);}
 ;
 
 
@@ -335,112 +342,28 @@ exp
 : MOINS exp %prec UNA         {}
          // -x + y lue comme (- x) + y  et pas - (x + y)
 | exp PLUS exp                { 
-                              if ($1 == INT) {
-                                  if ($3 == INT) {
-                                      $$ = INT;
-                                  }
-                                  else if ($3 == FLOAT) {
-                                      printf("I2F2\n");
-                                  }
-                              }
-                              else if ($1 == FLOAT) {
-                                  if ($3 == INT) {
-                                      printf("I2F\n");
-                                  }
-                                  else if ($3 == FLOAT) {
-                                      $$ = FLOAT;
-                                  }
-                              }
-                              if ($$ == INT) { printf("ADDI\n");}
-                              else if ($$ == FLOAT) { printf("ADDF\n");}
                               // ajouter une message de errur en cas d erreur
-                              
+                              $$ = print_expression($1, $3, "ADD");
                               }
 | exp MOINS exp               {
-                              if ($1 == INT) {
-                                  if ($3 == INT) {
-                                      $$ = INT;
-                                  }
-                                  else if ($3 == FLOAT) {
-                                      printf("I2F2\n");
-                                  }
-                              }
-                              else if ($1 == FLOAT) {
-                                  if ($3 == INT) {
-                                      printf("I2F\n");
-                                  }
-                                  else if ($3 == FLOAT) {
-                                      $$ = FLOAT;
-                                  }
-                              }
-                              if ($$ == INT) { printf("SUBI\n");}
-                              else if ($$ == FLOAT) { printf("SUBF\n");}
+                              $$ = print_expression($1, $3, "SUB");
                               }
 | exp STAR exp                {
-                                if ($1 == INT) {
-                                  if ($3 == INT) {
-                                      $$ = INT;
-                                  }
-                                  else if ($3 == FLOAT) {
-                                      printf("I2F2\n");
-                                  }
-                              }
-                              else if ($1 == FLOAT) {
-                                  if ($3 == INT) {
-                                      printf("I2F\n");
-                                  }
-                                  else if ($3 == FLOAT) {
-                                      $$ = FLOAT;
-                                  }
-                              }
-                              if ($$ == INT) { printf("MULTI\n");}
-                              else if ($$ == FLOAT) { printf("MULTF\n");}
+                              $$ = print_expression($1, $3, "MULT");
                                 }               
 | exp DIV exp                 { 
-                              if ($1 == INT) {
-                                  if ($3 == INT) {
-                                      $$ = INT;
-                                  }
-                                  else if ($3 == FLOAT) {
-                                      printf("I2F2\n");
-                                  }
+                              $$ = print_expression($1, $3, "DIV");
                               }
-                              else if ($1 == FLOAT) {
-                                  if ($3 == INT) {
-                                      printf("I2F\n");
-                                  }
-                                  else if ($3 == FLOAT) {
-                                      $$ = FLOAT;
-                                  }
-                              }
-                              if ($$ == INT) { printf("DIVI\n");}
-                              else if ($$ == FLOAT) { printf("DIVF\n");}
-                              }
-| PO exp PF                   {}
+| PO exp PF                   {/*$$ = $2;*/}
 | ID                          { 
-                                // printf("les cordonnes de %s sont offset=%d depth=%d\n", $1, get_symbol_value($1)->offset, get_symbol_value($1)->depth);
                                 $$ = get_symbol_value($1)->type;
-                                printf("LOADP(%d)\n", get_symbol_value($1)->offset);
 
-                                // if(depth == 0){
-                                //   printf("LOADP(%d)\n", get_symbol_value($1)->offset);
-                                // }
-                                // else{
-                                //   // ce morcceau de code sert à afficher LOADP(stack[...bp] +1)
-                                //   char * str  = "LOADP(";
-                                //   int i = depth - get_symbol_value($1)->depth;
-                                //   while (i < 0){
-                                //     str = concatenate_strings(str, "stack[");
-                                //     --i;
-                                //   }
-                                //   i = depth - get_symbol_value($1)->depth;
-                                //   str = concatenate_strings(str, "bp");
-                                //   while (i < 0){
-                                //     str = concatenate_strings(str, "]");
-                                //   }
-                                //   str = concatenate_strings(str, "+ 1)");
-                                //   printf("%s\n", str);
-                                // }
+                                if(depth == 0){
+                                  printf("LOADP(%d)\n", get_symbol_value($1)->offset);
+                                }
+                                else{
+                                 print_loadp_or_storep(depth, get_symbol_value($1)->depth , get_symbol_value($1)->offset, 'l');
+                                }
   }
 | app                         {}
 | NUM                         {$$ = INT ; printf("LOADI(%d)\n", $1 );}

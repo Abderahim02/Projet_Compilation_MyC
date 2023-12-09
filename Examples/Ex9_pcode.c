@@ -10,6 +10,11 @@ return stack[sp-1].int_value;
 
 
 
+
+
+
+
+
 LOADI(0)
 LOADI(0)
 LOADI(0)

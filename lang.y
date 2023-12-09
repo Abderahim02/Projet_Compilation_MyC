@@ -110,6 +110,8 @@ int print_expression( int dollar_1, int dollar_3 ,char * operator){
 };
  // cette fonction sert à afficher LOADP(stack[...bp] +1) ou  STOREP(stack[...bp] +1)
 void print_loadp_or_storep(int _depth, int symbole_depth, int symbole_offset ,char store_or_load){
+                                printf("_depth = %d, sym_depth = %d, sym_offset = %d\n", _depth, 
+                                symbole_depth, symbole_offset);
                                   switch(store_or_load){
                                       case 'l':
                                         printf("LOADP(");
@@ -141,8 +143,9 @@ void print_loadp_or_storep(int _depth, int symbole_depth, int symbole_offset ,ch
 %type <string_value> fun_head
  /* Attention, la rêgle de calcul par défaut $$=$1 
     peut créer des demandes/erreurs de type d'attribut */
-%type <offset_value> prog glob_decl_list decl_list decl var_decl vlist 
+%type <offset_value> prog glob_decl_list decl_list decl var_decl vlist  params
 %type <label_value> if  else while bool_cond
+%type <int_value> arglist args
 %%
 
  // O. Déclaration globale
@@ -155,32 +158,41 @@ glob_decl_list : glob_decl_list fun { $$ = $1 ;}
 
 // I. Functions
 
-fun : type fun_head fun_body   {}
+fun : type fun_head fun_body   { }
 ;
 
 fun_head : ID PO PF            {
           // Pas de déclaration de fonction à l'intérieur de fonctions !
           if (depth>0) yyerror("Function must be declared at top level~!\n");
-            printf("%s pcode_%s()", type2string($<type_value>0), $1);
+            printf("void pcode_%s()", $1);
           }
 
       | ID PO params PF              {
           // Pas de déclaration de fonction à l'intérieur de fonctions !
           if (depth>0) yyerror("Function must be declared at top level~!\n");
-          char * parameters = $<string_value>3;
-          printf("%s pcode_%s( %s )", type2string($<type_value>0), $1,parameters);
-          free(parameters);
+          // char * parameters = $<string_value>3;
+          // printf("%s pcode_%s( %s )", type2string($<type_value>0), $1,parameters);
+          // free(parameters);
+            printf("void pcode_%s()", $1);
       }
 ;
 
 params: type ID vir params     {
-                    $<string_value>$ = concatenate_strings(
+                   /*  $<string_value>$ = concatenate_strings(
                       concatenate_strings(
                         concatenate_strings(type2string($<type_value>1), " " ), concatenate_strings($2, ",")), 
-                        $<string_value>4);
+                        $<string_value>4); */
+                   printf("$$ = %d\n", $$);
+                   set_symbol_value($2, makeSymbol( $<type_value>1 , $<int_value>$ - INT - 2 , depth + 1 ));
+                   $$ = $4 - 1;
+
                                 } // récursion droite pour numéroter les paramètres du dernier au premier
 | type ID                      { 
-                    $<string_value>$ = concatenate_strings(concatenate_strings(type2string($<type_value>1), " "), $2);
+                   /* $<string_value>$ = concatenate_strings(concatenate_strings(type2string($<type_value>1), " "), $2); */
+                   // ici on depth + 1 dans la profondeur de l argument car on a lu que deux
+                    // parentheses int fun_name(int x){} alors on a pas encore entré dans le bloc
+                    // pour incrementer depth                   
+                   set_symbol_value($2, makeSymbol( $<type_value>1 , -1 , depth + 1  ));
 }
 
 
@@ -219,7 +231,6 @@ vlist: vlist vir ID            { // récursion gauche pour traiter les variables
                                       if($<type_value>0 == INT){
                                         //on peut ne pas afficher l offset 
                                         printf("LOADI(0)\n");
-                                        
                                       }
                                      else if($<type_value>0 == FLOAT){
                                       printf("LOADF(0.0)\n");
@@ -232,7 +243,6 @@ vlist: vlist vir ID            { // récursion gauche pour traiter les variables
                                       set_symbol_value($1, makeSymbol( $<type_value>0 , $$ , depth  ));
                                       if($<type_value>0 == INT){
                                         printf("LOADI(0)\n");
-
                                       }
                                       else if($<type_value>0 == FLOAT){
                                         printf("LOADF(0.0)\n");
@@ -385,17 +395,25 @@ exp
 // V.3 Applications de fonctions
 
 
-app : fid PO args PF          {}
+app : fid PO args PF          {
+                              printf("SAVEBP\n"); 
+                              printf("CALL(pcode_%s)\n", $<string_value>1);
+                              printf("RESTOREBP\n");
+                              printf("ENDCALL(%d)\n", $3);
+                              
+                              }
 ;
 
-fid : ID                      {}
+fid : ID                      { $<string_value>$ = $1; }
 
-args :  arglist               {}
-|                             {}
+args :  arglist               { $$ = $1; // on remonte la valeur du nombre d arguments 
+                                }
+|                             {$$ = 0;}
 ;
 
-arglist : arglist VIR exp     {} // récursion gauche pour empiler les arguements de la fonction de gauche à droite
-| exp                         {}
+arglist : arglist VIR exp     { // on stocke le nombre d arguments ici
+                                $$ = $1 + 1;} // récursion gauche pour empiler les arguements de la fonction de gauche à droite
+| exp                         { $$ = 1;}
 ;
 
 

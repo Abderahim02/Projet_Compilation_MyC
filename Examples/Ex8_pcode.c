@@ -1,6 +1,6 @@
 
 // PCode Header
-#include "PCode.h"
+#include "../PCode/PCode.h"
 
 int main() {
 pcode_main();

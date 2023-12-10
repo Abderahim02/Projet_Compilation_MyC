@@ -110,8 +110,8 @@ int print_expression( int dollar_1, int dollar_3 ,char * operator){
 };
  // cette fonction sert à afficher LOADP(stack[...bp] +1) ou  STOREP(stack[...bp] +1)
 void print_loadp_or_storep(int _depth, int symbole_depth, int symbole_offset ,char store_or_load){
-                                printf("_depth = %d, sym_depth = %d, sym_offset = %d\n", _depth, 
-                                symbole_depth, symbole_offset);
+                                // printf("_depth = %d, sym_depth = %d, sym_offset = %d\n", _depth, 
+                                // symbole_depth, symbole_offset);
                                   switch(store_or_load){
                                       case 'l':
                                         printf("LOADP(");
@@ -204,7 +204,7 @@ fun_body : fao block faf       {}
 
 fao : AO                       { printf("{\n"); depth++;}
 ;
-faf : AF                       {printf("}\n") ; depth--;}
+faf : AF                       { printf("}\n"); depth--;}
 ;
 
 
@@ -367,7 +367,7 @@ exp
 | PO exp PF                   {/*$$ = $2;*/}
 | ID                          { 
                                 $$ = get_symbol_value($1)->type;
-
+                                // on garde l ancien affichage pour les varoables globales 
                                 if(depth == 0){
                                   printf("LOADP(%d)\n", get_symbol_value($1)->offset);
                                 }
